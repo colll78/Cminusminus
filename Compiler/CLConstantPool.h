@@ -9,7 +9,7 @@ public:
 	int find(CLCPInfo& cp_info);
 	CLCPInfo* cp_item(int i);
 	int add_cp_item(CLCPInfo &cp_info);
-	void write(CLOutputStream out);
+	void write(CLOutputStream& out);
 	int constant_class_info(std::string s);
 	int constant_field_ref_info(std::string class_name, std::string name, std::string type);
 	int constant_method_ref_info(std::string class_name, std::string name, std::string type);

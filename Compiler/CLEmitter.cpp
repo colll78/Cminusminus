@@ -1,4 +1,10 @@
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 #include "CLEmitter.h"
+#include <filesystem>
+#include <locale>
+#include <codecvt>
+
+
 
 CLException::CLException(std::string start_label, std::string end_label, std::string handler_label, std::string catch_type)
 : start_label(start_label), end_label(end_label), handler_label(handler_label), catch_type(catch_type) {}
@@ -111,6 +117,98 @@ void CLEmitter::add_field_info(std::vector<std::string> access_flags, std::strin
 	//fields.push_back()
 }
 
+int CLEmitter::type_stack_residue(std::string descriptor){
+	int i = 0;
+	char c = descriptor.at(0);
+	switch (c) {
+	case 'B':
+	case 'C':
+	case 'I':
+	case 'F':
+	case 'L':
+	case 'S':
+	case 'Z':
+	case '[':
+		i = 1;
+		break;
+	case 'J':
+	case 'D':
+		i = 2;
+		break;
+	}
+	return i;
+}
+
+int CLEmitter::method_stack_residue(std::string descriptor){
+	int i = 0;
+	std::string::size_type rparen_index = descriptor.find_last_of(")");
+	if (rparen_index == std::string::npos) {
+		report_emitter_error(descriptor, " is not a valid method descriptor.");
+	}
+	std::string arg_types = descriptor.substr(1, descriptor.size() - rparen_index);
+	std::string return_type = descriptor.substr(rparen_index + 1);
+	for (int j = 0; j < arg_types.size(); j++) {
+		char c = arg_types.at(j);
+		switch(c){
+		case 'B':
+		case 'C':
+		case 'I':
+		case 'F':
+		case 'S':
+		case 'Z':
+			i -= 1;
+			break;
+		case '[':
+			break;
+		case 'J':
+		case 'D':
+			i -= 2;
+			break;
+		case 'L':
+			std::string::size_type k = arg_types.find(';', j);
+			j = k;
+			i -= 1;
+			break;
+		}
+	}
+	i += type_stack_residue(return_type);
+	return i;
+}
+
+int CLEmitter::argument_count(std::string descriptor){
+	int i = 0;
+	std::string::size_type rparen_index = descriptor.find_last_of(")");
+	if (rparen_index == std::string::npos) {
+		report_emitter_error(descriptor, " is not a valid method descriptor.");
+	}
+	std::string arg_types = descriptor.substr(1, rparen_index);
+	for (int j = 0; j < arg_types.size(); j++) {
+		char c = arg_types.at(j);
+		switch (c) {
+		case 'B':
+		case 'C':
+		case 'I':
+		case 'F':
+		case 'S':
+		case 'Z':
+			i += 1;
+			break;
+		case '[':
+			break;
+		case 'J':
+		case 'D':
+			i += 2;
+			break;
+		case 'L':
+			std::string::size_type k = arg_types.find(';', j);
+			j = k;
+			i++;
+			break;
+		}
+	}
+	return i;
+}
+
 bool CLEmitter::valid_internal_form(std::string name) {
 	if ((name == "") || (name[0] == '/') || (name[name.size() - 1] == '\\')) {
 		return false;
@@ -131,7 +229,7 @@ bool CLEmitter::valid_internal_form(std::string name) {
 }
 
 bool CLEmitter::valid_type_descriptor(std::string descriptor){
-	if (descriptor != "") {
+	if (!descriptor.empty()) {
 		switch (descriptor[0]) {
 		case 'B':
 		case 'C':
@@ -326,6 +424,39 @@ CLConstantValueAttribute CLEmitter::constant_value_attribute(int c){
 	return CLConstantValueAttribute(attribute_name_index, 2, c);
 }
 
+CLCodeAttribute CLEmitter::code_attribute(std::vector<int> byte_code, std::vector<CLExceptionInfo> exception_table, int stack_depth_i, int max_locals){
+	int code_length = byte_code.size();
+	int attribute_name_index = constant_pool.constant_UTF8_info(CLConstants::ATT_CODE);
+	int attribute_length = code_length + 8 * exception_table.size() + 12;
+	for (int i = 0; i < m_code_attributes.size(); i++) {
+		attribute_length += 6 + m_code_attributes[i]->attribute_length;
+	}
+	return CLCodeAttribute(attribute_name_index, attribute_length, stack_depth_i, max_locals, (long long) code_length, byte_code, 
+		exception_table.size(), exception_table, m_code_attributes.size(), m_code_attributes);
+}
+
+CLExceptionsAttribute CLEmitter::exceptions_attribute(std::vector<std::string> exceptions){
+	int attribute_name_index = constant_pool.constant_UTF8_info(CLConstants::ATT_EXCEPTIONS);
+	std::vector<int> exception_index_table;
+	for (int i = 0; i < exceptions.size(); i++) {
+		std::string e = exceptions.at(i);
+		exception_index_table.push_back(constant_pool.constant_class_info(e));
+	}
+	return CLExceptionsAttribute(attribute_name_index, exception_index_table.size() * 2 + 2, exception_index_table.size(), exception_index_table);
+}
+
+CLInnerClassesAttribute CLEmitter::inner_classes_attribute(){
+	int attribute_name_index = constant_pool.constant_UTF8_info(CLConstants::ATT_INNER_CLASSES);
+	long long attribute_length = inner_classes.size() * 8 + 2;
+	return CLInnerClassesAttribute(attribute_name_index, attribute_length, inner_classes.size(), inner_classes);
+
+}
+
+CLSyntheticAttribute CLEmitter::synthetic_attribute(){
+	int attribute_name_index = constant_pool.constant_UTF8_info(CLConstants::ATT_SYNTHETIC);
+	return CLSyntheticAttribute(attribute_name_index, 0);
+}
+
 /*
 CLCodeAttribute CLEmitter::code_attribute(std::vector<int> byte_code, std::vector<CLExceptionInfo> exception_table, int stack_depth_i, int max_locals){
 	int code_length = byte_code.size();
@@ -358,13 +489,39 @@ bool CLEmitter::has_error_occurred(){
 	return error_has_occurred;
 }
 
-void CLEmitter::add_class(std::vector<std::string> access_flags, std::string this_class, std::string super_class, std::vector<std::string> super_interfaces, bool is_synthetic){
+void CLEmitter::add_class(std::vector<std::string> access_flags, std::string this_class, std::string super_class, std::optional<std::vector<std::string>> super_interfaces, bool is_synthetic){
+	cl_file = CLFile();
+	constant_pool = CLConstantPool();
+	interfaces.clear();
+	fields.clear();
+	methods.clear();
+	attributes.clear();
+	inner_classes.clear();
+
 	error_has_occurred = false;
 	cl_file.magic = CLConstants::MAGIC;
 	cl_file.major_version = CLConstants::MAJOR_VERSION;
 	cl_file.minor_version = CLConstants::MINOR_VERSION;
 	if (!valid_internal_form(this_class)) {
-
+		report_emitter_error(this_class, " is not in internal form");
+	}
+	if (!valid_internal_form(super_class)) {
+		report_emitter_error(super_class, " is not in internal form");
+	}
+	for (int i = 0; i < access_flags.size(); i++) {
+		cl_file.access_flags |= CLFile::access_flag_to_int(access_flags.at(i));
+	}
+	name = this_class;
+	cl_file.this_class = constant_pool.constant_class_info(this_class);
+	cl_file.this_class = constant_pool.constant_class_info(super_class);
+	for (int i = 0; super_interfaces && i < (*super_interfaces).size(); i++) {
+		if (!valid_internal_form((*super_interfaces).at(i))) {
+			report_emitter_error((*super_interfaces).at(i), " is not in internal form.");
+		}
+		interfaces.push_back(constant_pool.constant_class_info((*super_interfaces).at(i)));
+	}
+	if (is_synthetic){
+		add_class_attribute(std::make_unique<CLSyntheticAttribute>(synthetic_attribute()));
 	}
 }
 
@@ -401,7 +558,7 @@ void CLEmitter::add_field(std::vector<std::string> access_flags, std::string nam
 	add_field_info(access_flags, name, "Ljava/lang/String;", is_synthetic, constant_pool.constant_string_info(s));
 }
 
-void CLEmitter::add_method(std::vector<std::string> access_flags, std::string name, std::string descriptor, std::vector<std::string> exceptions, bool is_synthetic){
+void CLEmitter::add_method(std::vector<std::string> access_flags, std::string name, std::string descriptor, std::optional<std::vector<std::string>> exceptions, bool is_synthetic){
 	if (!valid_method_descriptor(descriptor)) {
 		report_emitter_error(descriptor, " is not a valid type descriptor for method");
 	}
@@ -417,8 +574,8 @@ void CLEmitter::add_method(std::vector<std::string> access_flags, std::string na
 	m_argument_count = argument_count(descriptor) + (std::find(access_flags.begin(), access_flags.end(), "static") != access_flags.end()) ? 0 : 1;
 	m_name_index = constant_pool.constant_UTF8_info(name);
 	m_descriptor_index = constant_pool.constant_UTF8_info(descriptor);
-	if (!exceptions.empty()) {
-		CLExceptionsAttribute except_attri = exceptions_attribute(exceptions);
+	if (exceptions) {
+		CLExceptionsAttribute except_attri = exceptions_attribute(*exceptions);
 		m_attributes.push_back(std::make_unique<CLExceptionsAttribute>(except_attri));
 	}
 	if (is_synthetic) {
@@ -428,64 +585,273 @@ void CLEmitter::add_method(std::vector<std::string> access_flags, std::string na
 	
 }
 
-void CLEmitter::add_exception_handler(std::string start_label, std::string end_label, std::string handler_label, std::string catch_type)
-{
+void CLEmitter::add_exception_handler(std::string start_label, std::string end_label, std::string handler_label, std::string catch_type){
+	if (!catch_type.empty() && !valid_internal_form(catch_type)) {
+		report_emitter_error(catch_type, " is not in internal form");
+	}
+	CLException e(start_label, end_label, handler_label, catch_type);
+	m_exception_handlers.push_back(e);
 }
 
-void CLEmitter::add_no_arg_instruction(int opcode)
-{
+void CLEmitter::add_no_arg_instruction(int opcode){
+	std::unique_ptr<CLInstruction> instr; 
+	switch (CLInstruction::instruction_info[opcode].category) {
+	case CLConstants::ARITHMETIC1:
+		instr = std::make_unique<CLArithmeticInstruction>(opcode, m_pc++); 
+		break;
+	case CLConstants::ARRAY2:
+		instr = std::make_unique<CLArrayInstruction>(opcode, m_pc++);
+		break;
+	case CLConstants::BIT:
+		instr = std::make_unique<CLBitInstruction>(opcode, m_pc++);
+		break;
+	case CLConstants::COMPARISON:
+		instr = std::make_unique<CLComparisonInstruction>(opcode, m_pc++);
+		break;
+	case CLConstants::CONVERSION:
+		instr = std::make_unique<CLConversionInstruction>(opcode, m_pc++);
+		break;
+	case CLConstants::LOAD_STORE1:
+		instr = std::make_unique<CLLoadStoreInstruction>(opcode, m_pc++);
+		break;
+	case CLConstants::METHOD2:
+		instr = std::make_unique<CLMethodInstruction>(opcode, m_pc++);
+		break;
+	case CLConstants::MISC:
+		instr = std::make_unique<CLMiscInstruction>(opcode, m_pc++);
+		break;
+	case CLConstants::STACK:
+		instr = std::make_unique<CLStackInstruction>(opcode, m_pc++);
+		break;
+	default:
+		report_opcode_error(opcode);
+		return;
+	}
+	m_pc += instr.get()->get_operand_count();
+	m_code.push_back(std::move(instr));
+	m_instruction_after_label = true;
 }
 
-void CLEmitter::add_one_arg_instruction(int opcode, int arg)
-{
+void CLEmitter::add_one_arg_instruction(int opcode, int arg){
+	std::unique_ptr<CLInstruction> instr = nullptr;
+	bool is_widened = false;
+	switch (CLInstruction::instruction_info[opcode].category) {
+	case CLConstants::LOAD_STORE2:
+		is_widened = arg > 255;
+		if (is_widened) {
+			m_code.push_back(std::make_unique<CLLoadStoreInstruction>(CLConstants::WIDE, m_pc++));
+		}
+		instr = std::make_unique<CLLoadStoreInstruction>(opcode, m_pc++, arg, is_widened);
+		break;
+	case CLConstants::LOAD_STORE3:
+		instr = std::make_unique<CLLoadStoreInstruction>(opcode, m_pc++, arg);
+		break;
+	case CLConstants::FLOW_CONTROL2:
+		is_widened = arg > 255;
+		if (is_widened) {
+			m_code.push_back(std::make_unique<CLLoadStoreInstruction>(CLConstants::WIDE, m_pc++));
+		}
+		instr = std::make_unique<CLFlowControlInstruction>(m_pc++, arg, is_widened);
+		break;
+	default:
+		report_opcode_error(opcode);
+	}
+	if (instr != nullptr) {
+		m_pc += instr.get()->get_opcode();
+		m_code.push_back(std::move(instr));
+		m_instruction_after_label = true;
+	}
 }
 
-void CLEmitter::add_IINC_instruction(int index, int const_val)
-{
+void CLEmitter::add_IINC_instruction(int index, int const_val){
+	bool is_widened = index > 255 || const_val < -128 || const_val > 128;
+	if (is_widened) {
+		m_code.push_back(std::make_unique<CLLoadStoreInstruction>(CLConstants::WIDE, m_pc++));
+	}
+	std::unique_ptr<CLInstruction> instr = std::make_unique<CLArithmeticInstruction>(CLConstants::IINC, m_pc++, index, const_val, is_widened);
+	m_pc += instr.get()->get_operand_count();
+	m_code.push_back(std::move(instr));
+	m_instruction_after_label = true;
+
 }
 
-void CLEmitter::add_member_access_instruction(int opcode, std::string target, std::string name, std::string type)
-{
+void CLEmitter::add_member_access_instruction(int opcode, std::string target, std::string name, std::string type){
+	if (!valid_internal_form(target)) {
+		report_emitter_error(e_current_method, ": ", target, " is not in internal form");
+	}
+	std::unique_ptr<CLInstruction> instr = nullptr;
+	int index, stack_units;
+	switch (CLInstruction::instruction_info[opcode].category) {
+	case CLConstants::FIELD:
+		if (!valid_type_descriptor(type)) {
+			report_emitter_error(e_current_method, ": ", type, " is not a valid type descriptor for field.");
+		}
+		index = constant_pool.constant_field_ref_info(target, name, type);
+		stack_units = type_stack_residue(type);
+		if ((opcode == CLConstants::GETFIELD) || (opcode == CLConstants::PUTFIELD)) {
+			stack_units--;
+		}
+		instr = std::make_unique<CLFieldInstruction>(opcode, m_pc++, index, stack_units);
+		break;
+	case CLConstants::METHOD1:
+		if (!valid_method_descriptor(type)) {
+			report_emitter_error(e_current_method, ": ", type, " is not a valid type descriptor for method");
+		}
+		if (opcode == CLConstants::INVOKEINTERFACE) {
+			index = constant_pool.constant_interface_method_ref_info(target, name, type);
+		}
+		else {
+			index = constant_pool.constant_method_ref_info(target, name, type);
+		}
+		stack_units = method_stack_residue(type);
+		if (opcode != CLConstants::INVOKESTATIC) {
+			stack_units--;
+		}
+		instr = std::make_unique<CLMethodInstruction>(opcode, m_pc++, index, stack_units);
+
+		if (opcode == CLConstants::INVOKEINTERFACE) {
+			CLMethodInstruction* b = dynamic_cast<CLMethodInstruction*>(instr.get());
+			b->set_argument_count(argument_count(type) + 1);
+		}
+		break;
+	default:
+		report_opcode_error(opcode);
+	}
+	if (instr == nullptr) {
+		m_pc += instr.get()->get_operand_count();
+		m_code.push_back(std::move(instr));
+	}
 }
 
-void CLEmitter::add_reference_instruction(int opcode, std::string type)
-{
+void CLEmitter::add_reference_instruction(int opcode, std::string type){
+	if (!valid_type_descriptor(type) && !valid_internal_form(type)) {
+		report_emitter_error(e_current_method, ": ", type, " is neither a type descriptor nor in internal form");
+	}
+	std::unique_ptr<CLInstruction> instr = nullptr;
+	switch (CLInstruction::instruction_info[opcode].category) {
+	case CLConstants::OBJECT:
+	{
+		int index = constant_pool.constant_class_info(type);
+		instr = std::make_unique<CLObjectInstruction>(opcode, m_pc++, index);
+		break;
+	} 
+	default:
+		report_opcode_error(opcode);
+	}
+	if (instr != nullptr) {
+		m_pc += instr.get()->get_operand_count();
+		m_code.push_back(std::move(instr));
+	}
 }
 
-void CLEmitter::add_array_instruction(int opcode, std::string type)
-{
+void CLEmitter::add_array_instruction(int opcode, std::string type){
+	std::unique_ptr<CLInstruction> instr = nullptr;
+	switch (CLInstruction::instruction_info[opcode].category) {
+	case CLConstants::ARRAY1:
+		int index = 0;
+		if (opcode == CLConstants::NEWARRAY) {
+			if (jmm_string_utils::iequals(type, "Z")) {
+				index = 4;
+			}
+			else if (jmm_string_utils::iequals(type, "C")) {
+				index = 5;
+			}
+			else if (jmm_string_utils::iequals(type, "F")) {
+				index = 6;
+			}
+			else if (jmm_string_utils::iequals(type, "D")) {
+				index = 7;
+			}
+			else if (jmm_string_utils::iequals(type, "B")) {
+				index = 8;
+			}
+			else if (jmm_string_utils::iequals(type, "S")) {
+				index = 9;
+			}
+			else if (jmm_string_utils::iequals(type, "I")) {
+				index = 10;
+			}
+			else if (jmm_string_utils::iequals(type, "J")) {
+				index = 11;
+			}
+			else {
+				report_emitter_error(e_current_method, ": ", type, " is not a valid primitive type.");
+			}
+		}
+		else {
+			if (!valid_type_descriptor(type) && !valid_internal_form(type)) {
+				report_emitter_error(e_current_method, ": ", type, " is not a valid type descriptor for an array.");
+			}
+			index = constant_pool.constant_class_info(type);
+		}
+		if (instr != nullptr) {
+			m_pc += instr.get()->get_operand_count();
+			m_code.push_back(std::move(instr));
+		}
+	}
 }
 
-void CLEmitter::add_MULTIANEWARRAY_instruction(std::string type, int dim)
-{
+void CLEmitter::add_MULTIANEWARRAY_instruction(std::string type, int dim){
+	std::unique_ptr<CLInstruction> instr = nullptr;
+	if (!valid_type_descriptor(type)) {
+		report_emitter_error(e_current_method, ": ", type, " is not a valid type descriptor for an array.");
+	}
+	int index = constant_pool.constant_class_info(type);
+	instr = std::make_unique<CLArrayInstruction>(CLConstants::MULTIANEWARRAY, m_pc++, index, dim);
+	if (instr != nullptr) {
+		m_pc += instr.get()->get_operand_count();
+		m_code.push_back(std::move(instr));
+	}
 }
 
-void CLEmitter::add_branch_instruction(int opcode, std::string label)
-{
+void CLEmitter::add_branch_instruction(int opcode, std::string label){
+	std::unique_ptr<CLInstruction> instr = nullptr;
+	switch (CLInstruction::instruction_info[opcode].category) {
+	case CLConstants::FLOW_CONTROL1:
+		instr = std::make_unique<CLFlowControlInstruction>(opcode, m_pc++, label);
+		break;
+	default:
+		report_opcode_error(opcode);
+	}
+	if (instr != nullptr) {
+		m_pc += instr.get()->get_operand_count();
+		m_code.push_back(std::move(instr));
+		m_instruction_after_label = true;
+	}
 }
 
-void CLEmitter::add_TABLESWITCH_instruction(std::string default_label, int low, int high, std::vector<std::string> labels)
-{
+void CLEmitter::add_TABLESWITCH_instruction(std::string default_label, int low, int high, std::vector<std::string> labels){
+	std::unique_ptr<CLInstruction> instr = std::make_unique<CLFlowControlInstruction>(CLConstants::TABLESWITCH, m_pc++, default_label, low, high, labels);
+	m_pc += instr.get()->get_operand_count();
+	m_code.push_back(std::move(instr));
+	m_instruction_after_label = true;
 }
 
-void CLEmitter::add_LDC_instruction(int i)
-{
+void CLEmitter::add_LOOKUPSWITCH_instruction(std::string default_label, int num_pairs, std::map<int, std::string> match_label_pairs){
+	std::unique_ptr<CLInstruction> instr = std::make_unique<CLFlowControlInstruction>(CLConstants::LOOKUPSWITCH, m_pc++, default_label, num_pairs, match_label_pairs);
+	m_pc += instr.get()->get_operand_count();
+	m_code.push_back(std::move(instr));
+	m_instruction_after_label = true;
 }
 
-void CLEmitter::add_LDC_instruction(float f)
-{
+void CLEmitter::add_LDC_instruction(int i){
+	ldc_instruction(constant_pool.constant_integer_info(i));
 }
 
-void CLEmitter::add_LDC_instruction(long long l)
-{
+void CLEmitter::add_LDC_instruction(float f){
+	ldc_instruction(constant_pool.constant_float_info(f));
 }
 
-void CLEmitter::add_LDC_instruction(double d)
-{
+void CLEmitter::add_LDC_instruction(long long l){
+	ldc_instruction(constant_pool.constant_long_info(l));
 }
 
-void CLEmitter::add_LDC_instruction(std::string s)
-{
+void CLEmitter::add_LDC_instruction(double d){
+	ldc_instruction(constant_pool.constant_double_info(d));
+}
+
+void CLEmitter::add_LDC_instruction(std::string s){
+	ldc_instruction(constant_pool.constant_string_info(s));
 }
 
 void CLEmitter::add_class_attribute(std::unique_ptr<CLAttributeInfo> &&attribute){
@@ -503,5 +869,43 @@ void CLEmitter::add_field_attribute(std::unique_ptr<CLAttributeInfo> &&attribute
 void CLEmitter::add_code_attribute(std::unique_ptr<CLAttributeInfo> &&attribute){
 	m_code_attributes.push_back(std::move(attribute));
 }
+
+void CLEmitter::add_label(std::string label){
+	m_labels[label] = m_pc;
+	m_instruction_after_label = false;
+}
+
+std::string CLEmitter::create_label(){
+	return "Label" + m_label_count++;
+}
+
+int CLEmitter::get_pc(){
+	return m_pc;
+}
+
+CLConstantPool& CLEmitter::get_constant_pool(){
+	return constant_pool;
+}
+
+CLFile& CLEmitter::get_cl_file(){
+	return cl_file;
+}
+
+void CLEmitter::write(){
+	end_open_method_if_any();
+	if (!to_file) {
+		return;
+	}
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+	std::wstring wide_name = converter.from_bytes(name);
+	std::wstring outfile = dest_dir + std::filesystem::path::preferred_separator + wide_name + L".class";
+	CLOutputStream out(outfile);
+	cl_file.write(out);
+	out.flush_buffer();
+	out.close();
+}
+
+
+
 
 

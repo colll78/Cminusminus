@@ -2,8 +2,14 @@
 #include "jmm_utils.h"
 #include "iostream"
 
-CLOutputStream::CLOutputStream() : buf(8192), buf_count(0), cle_output_bytes(32), count(0), bytes_written(0) {
+CLOutputStream::CLOutputStream() : buf(8192), buf_count(0), cle_output_bytes(32), count(0), bytes_written(0) , closed(true){
 	
+}
+
+CLOutputStream::CLOutputStream(std::wstring f_name) : buf(8192), buf_count(0), cle_output_bytes(32), count(0), bytes_written(0) {
+	closed = false;
+	file_path = f_name;
+	file.open(file_path, std::fstream::binary);
 }
 
 void CLOutputStream::write(std::vector<std::byte> b, int off, int len) {
@@ -28,7 +34,11 @@ void CLOutputStream::write(std::vector<std::byte> b) {
 }
 
 void CLOutputStream::_write(std::byte b) {
-	CLOutputStream::cle_output_bytes.push_back(b);
+	if (!file_path.empty()) {
+		file.write(reinterpret_cast<const char*>(b), 1);
+	} else {
+		CLOutputStream::cle_output_bytes.push_back(b);
+	}
 	count++;
 }
 
@@ -163,6 +173,20 @@ void CLOutputStream::write_UTF(std::string str) {
 			bytearr[count++] = (std::byte) (0x80 | ((c >> 0) & 0x3F));
 		}
 		write(bytearr, 0, utflen + 2);
+	}
+}
+
+void CLOutputStream::open(){
+	if (closed) {
+		file.open(file_path, std::fstream::binary);
+		closed = false;
+	}
+}
+
+void CLOutputStream::close(){
+	if (!closed) {
+		file.close();
+		closed = true;
 	}
 }
 

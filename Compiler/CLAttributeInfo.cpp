@@ -4,7 +4,7 @@
 CLAttributeInfo::CLAttributeInfo(int attribute_name_index, long long attribute_length) : attribute_name_index(attribute_name_index), attribute_length(attribute_length){
 }
 
-void CLAttributeInfo::write(CLOutputStream out){
+void CLAttributeInfo::write(CLOutputStream& out){
 	out.write_short(attribute_name_index);
 	out.write_int((long long)attribute_length);
 }
@@ -12,7 +12,7 @@ void CLAttributeInfo::write(CLOutputStream out){
 CLConstantValueAttribute::CLConstantValueAttribute(int attribute_name_index, long long attribute_length, int constant_value_index) : CLAttributeInfo(attribute_name_index, attribute_length), constant_value_index(constant_value_index) {
 }
 
-void CLConstantValueAttribute::write(CLOutputStream out) {
+void CLConstantValueAttribute::write(CLOutputStream& out) {
 	CLAttributeInfo::write(out);
 	out.write_short(constant_value_index);
 }
@@ -20,7 +20,7 @@ void CLConstantValueAttribute::write(CLOutputStream out) {
 CLExceptionInfo::CLExceptionInfo(int start_pc, int end_pc, int handler_pc, int catch_type) : start_pc(start_pc), end_pc(end_pc), handler_pc(handler_pc), catch_type(catch_type){
 }
 
-void CLExceptionInfo::write(CLOutputStream out){
+void CLExceptionInfo::write(CLOutputStream& out){
 	out.write_short(start_pc);
 	out.write_short(end_pc);
 	out.write_short(handler_pc);
@@ -33,13 +33,13 @@ int CLCodeAttribute::int_value(int a, int b, int c, int d) {
 
 CLCodeAttribute::CLCodeAttribute(int attribute_name_index, long long attribute_length, int max_stack, int max_locals, 
 	long long code_length, std::vector<int> code, int exception_table_length, std::vector<CLExceptionInfo> exception_table,
-	int attributes_count, std::vector<CLAttributeInfo> attributes) :
+	int attributes_count, std::vector<std::unique_ptr<CLAttributeInfo>> &attributes) :
 	CLAttributeInfo(attribute_name_index, attribute_length), max_stack(max_stack), max_locals(max_locals), code_length(code_length), code(), exception_table_length(exception_table_length),
 	exception_table(exception_table), attributes_count(attributes_count), attributes(attributes)
 {
 }
 
-void CLCodeAttribute::write(CLOutputStream out){
+void CLCodeAttribute::write(CLOutputStream& out){
 	CLCodeAttribute::write(out);
 	out.write_short(max_stack);
 	out.write_short(max_locals);
@@ -53,7 +53,7 @@ void CLCodeAttribute::write(CLOutputStream out){
 	}
 	out.write_short(attributes_count);
 	for (int i = 0; i < attributes.size(); i++) {
-		attributes.at(i).write(out);
+		attributes.at(i).get()->write(out);
 	}
 }
 
@@ -62,7 +62,7 @@ CLExceptionsAttribute::CLExceptionsAttribute(int attribute_name_index, long long
 {
 }
 
-void CLExceptionsAttribute::write(CLOutputStream out) {
+void CLExceptionsAttribute::write(CLOutputStream& out) {
 	CLAttributeInfo::write(out);
 	out.write_short(number_of_exceptions);
 	for (int i = 0; i < exception_index_table.size(); i++) {
@@ -75,7 +75,7 @@ CLInnerClassInfo::CLInnerClassInfo(int inner_class_info_index, int outer_class_i
 {
 }
 
-void CLInnerClassInfo::write(CLOutputStream out){
+void CLInnerClassInfo::write(CLOutputStream& out){
 	out.write_short(inner_class_info_index);
 	out.write_short(outer_class_info_index);
 	out.write_short(inner_name_index);
@@ -87,7 +87,7 @@ CLInnerClassesAttribute::CLInnerClassesAttribute(int attribute_name_index, long 
 {
 }
 
-void CLInnerClassesAttribute::write(CLOutputStream out){
+void CLInnerClassesAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 	out.write_short(number_of_classes);
 	for (int i = 0; i < classes.size(); i++) {
@@ -100,7 +100,7 @@ CLEnclosingMethodAttribute::CLEnclosingMethodAttribute(int attribute_name_index,
 {
 }
 
-void CLEnclosingMethodAttribute::write(CLOutputStream out){
+void CLEnclosingMethodAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 	out.write_short(class_index);
 	out.write_short(method_index);
@@ -110,7 +110,7 @@ CLSyntheticAttribute::CLSyntheticAttribute(int attribute_name_index, long long a
 {
 }
 
-void CLSyntheticAttribute::write(CLOutputStream out){
+void CLSyntheticAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 }
 
@@ -118,7 +118,7 @@ CLSignatureAttribute::CLSignatureAttribute(int attribute_name_index, long long a
 : CLAttributeInfo(attribute_name_index, attribute_length), signature_index(signature_index) {
 }
 
-void CLSignatureAttribute::write(CLOutputStream out){
+void CLSignatureAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 	out.write_short(signature_index);
 }
@@ -128,7 +128,7 @@ CLSourceFileAttribute::CLSourceFileAttribute(int attribute_name_index, long long
 {
 }
 
-void CLSourceFileAttribute::write(CLOutputStream out){
+void CLSourceFileAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 	out.write_short(source_file_index);
 }
@@ -138,7 +138,7 @@ CLSourceDebugExtensionAttribute::CLSourceDebugExtensionAttribute(int attribute_n
 {
 }
 
-void CLSourceDebugExtensionAttribute::write(CLOutputStream out){
+void CLSourceDebugExtensionAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 	for (int i = 0; i < debug_extension.size(); i++) {
 		out.write_byte((int)debug_extension.at(i));
@@ -149,7 +149,7 @@ CLLineNumberInfo::CLLineNumberInfo(int start_pc, int line_number) : start_pc(sta
 {
 }
 
-void CLLineNumberInfo::write(CLOutputStream out){
+void CLLineNumberInfo::write(CLOutputStream& out){
 	out.write_short(start_pc);
 	out.write_short(line_number);
 }
@@ -163,7 +163,7 @@ CLLineNumberTableAttribute::CLLineNumberTableAttribute(int attribute_name_index,
 {
 }
 
-void CLLineNumberTableAttribute::write(CLOutputStream out){
+void CLLineNumberTableAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 	out.write_short(line_number_table_length);
 	for (int i = 0; i < line_number_table.size(); i++) {
@@ -176,7 +176,7 @@ CLLocalVariableInfo::CLLocalVariableInfo(int start_pc, int length, int name_inde
 {
 }
 
-void CLLocalVariableInfo::write(CLOutputStream out){
+void CLLocalVariableInfo::write(CLOutputStream& out){
 	out.write_short(start_pc);
 	out.write_short(length);
 	out.write_short(name_index);
@@ -189,7 +189,7 @@ CLLocalVariableTableAttribute::CLLocalVariableTableAttribute(int attribute_name_
 {
 }
 
-void CLLocalVariableTableAttribute::write(CLOutputStream out){
+void CLLocalVariableTableAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 	out.write_short(local_variable_table_length);
 	for (int i = 0; i < local_variable_table.size(); i++) {
@@ -202,7 +202,7 @@ CLLocalVariableTypeInfo::CLLocalVariableTypeInfo(int start_pc, int length, int n
 {
 }
 
-void CLLocalVariableTypeInfo::write(CLOutputStream out){
+void CLLocalVariableTypeInfo::write(CLOutputStream& out){
 	out.write_short(start_pc);
 	out.write_short(length);
 	out.write_short(name_index);
@@ -215,7 +215,7 @@ CLLocalVariableTypeTableAttribute::CLLocalVariableTypeTableAttribute(int attribu
 {
 }
 
-void CLLocalVariableTypeTableAttribute::write(CLOutputStream out){
+void CLLocalVariableTypeTableAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 	out.write_short(local_variable_type_table_length);
 	for (int i = 0; i < local_variable_type_table.size(); i++) {
@@ -228,7 +228,7 @@ CLDeprecatedAttribute::CLDeprecatedAttribute(int attribute_name_index, long long
 {
 }
 
-void CLDeprecatedAttribute::write(CLOutputStream out){
+void CLDeprecatedAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 }
 
@@ -241,7 +241,7 @@ CLAnnotation::CLAnnotation(int type_index, int num_element_value_pairs, std::vec
 
 }
 
-void CLAnnotation::write(CLOutputStream out) {
+void CLAnnotation::write(CLOutputStream& out) {
 	out.write_short(type_index);
 	out.write_short(num_element_value_pairs);
 	for (int i = 0; i < element_value_pairs.size(); i++) {
@@ -263,11 +263,11 @@ CLElementValue::CLElementValue(CLAnnotation annotation_value) : annotation_value
 	tag = CLConstants::ELT_ANNOTATION;
 }
 
-CLElementValue::CLElementValue(int numValues, std::vector<CLElementValue> values) : num_values(num_values), values(values){
+CLElementValue:: CLElementValue(int num_values, std::vector<CLElementValue> values) : num_values(num_values), values(values){
 	tag = CLConstants::ELT_ARRAY;
 }
 
-void CLElementValue::write(CLOutputStream out){
+void CLElementValue::write(CLOutputStream& out){
 	out.write_byte(tag);
 	switch (tag) {
 	case CLConstants::ELT_B:
@@ -293,7 +293,7 @@ void CLElementValue::write(CLOutputStream out){
 		break;
 	case CLConstants::ELT_ARRAY:
 		out.write_int(num_values);
-		for (int i = 0; i < num_values; i++) {
+		for (int i = 0; i < num_values; i++) {	
 			values.at(i).write(out);
 		}
 	}
@@ -301,7 +301,7 @@ void CLElementValue::write(CLOutputStream out){
 
 CLElementValuePair::CLElementValuePair(int element_name_index, CLElementValue value) : element_name_index(element_name_index), value(value) {}
 
-void CLElementValuePair::write(CLOutputStream out){
+void CLElementValuePair::write(CLOutputStream& out){
 	out.write_short(element_name_index);
 	value.write(out);
 }
@@ -309,7 +309,7 @@ void CLElementValuePair::write(CLOutputStream out){
 CLRuntimeVisibleAnnotationsAttribute::CLRuntimeVisibleAnnotationsAttribute(int attribute_name_index, long long attribute_length, int num_annotations, std::vector<CLAnnotation> annotations)
  : CLAttributeInfo(attribute_name_index, attribute_length), num_annotations(num_annotations), annotations(annotations){}
 
-void CLRuntimeVisibleAnnotationsAttribute::write(CLOutputStream out) {
+void CLRuntimeVisibleAnnotationsAttribute::write(CLOutputStream& out) {
 	CLAttributeInfo::write(out);
 	out.write_short(num_annotations);
 	for (int i = 0; i < annotations.size(); i++) {
@@ -320,7 +320,7 @@ void CLRuntimeVisibleAnnotationsAttribute::write(CLOutputStream out) {
 CLRuntimeInvisibleAnnotationsAttribute::CLRuntimeInvisibleAnnotationsAttribute(int attribute_name_index, long long attribute_length, int num_annotations, std::vector<CLAnnotation> annotations)
 	: CLAttributeInfo(attribute_name_index, attribute_length), num_annotations(num_annotations), annotations(annotations) {}
 
-void CLRuntimeInvisibleAnnotationsAttribute::write(CLOutputStream out) {
+void CLRuntimeInvisibleAnnotationsAttribute::write(CLOutputStream& out) {
 	CLAttributeInfo::write(out);
 	out.write_short(num_annotations);
 	for (int i = 0; i < annotations.size(); i++) {
@@ -331,7 +331,7 @@ void CLRuntimeInvisibleAnnotationsAttribute::write(CLOutputStream out) {
 CLParameterAnnotationInfo::CLParameterAnnotationInfo(int num_annotations, std::vector<CLAnnotation> annotations)
 : num_annotations(num_annotations), annotations(annotations) {}
 
-void CLParameterAnnotationInfo::write(CLOutputStream out){
+void CLParameterAnnotationInfo::write(CLOutputStream& out){
 	out.write_short(num_annotations);
 	for (int i = 0; i < annotations.size(); i++) {
 		annotations.at(i).write(out);
@@ -341,7 +341,7 @@ void CLParameterAnnotationInfo::write(CLOutputStream out){
 CLRuntimeVisibleParameterAnnotationsAttribute::CLRuntimeVisibleParameterAnnotationsAttribute(int attribute_name_index, long long attribute_length, short num_parameters, std::vector<CLParameterAnnotationInfo> parameter_annotations)
 	: CLAttributeInfo(attribute_name_index, attribute_length) {}
 
-void CLRuntimeVisibleParameterAnnotationsAttribute::write(CLOutputStream out){
+void CLRuntimeVisibleParameterAnnotationsAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 	out.write_byte(num_parameters);
 	for (int i = 0; i < parameter_annotations.size(); i++) {
@@ -353,7 +353,7 @@ CLRuntimeInvisibleParameterAnnotationsAttribute::CLRuntimeInvisibleParameterAnno
 	: CLAttributeInfo(attribute_name_index, attribute_length), num_parameters(num_parameters), parameter_annotations(parameter_annotations)
 {}
 
-void CLRuntimeInvisibleParameterAnnotationsAttribute::write(CLOutputStream out){
+void CLRuntimeInvisibleParameterAnnotationsAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 	out.write_byte(num_parameters);
 	for (int i = 0; i < parameter_annotations.size(); i++) {
@@ -364,7 +364,7 @@ void CLRuntimeInvisibleParameterAnnotationsAttribute::write(CLOutputStream out){
 CLAnnotationDefaultAttribute::CLAnnotationDefaultAttribute(int attribute_name_index, long long attribute_length, CLElementValue default_value)
 	: CLAttributeInfo(attribute_name_index, attribute_length), default_value(default_value) {}
 
-void CLAnnotationDefaultAttribute::write(CLOutputStream out){
+void CLAnnotationDefaultAttribute::write(CLOutputStream& out){
 	CLAttributeInfo::write(out);
 	default_value.write(out);
 }

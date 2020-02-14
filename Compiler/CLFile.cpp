@@ -2,7 +2,7 @@
 #include "CLConstants.h"
 #include "jmm_utils.h"
 
-void CLFile::write(CLOutputStream out) {
+void CLFile::write(CLOutputStream &out) {
 	out.write_int(magic);
 	out.write_short(minor_version);
 	out.write_short(major_version);

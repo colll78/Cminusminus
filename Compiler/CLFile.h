@@ -20,7 +20,7 @@ public:
 	std::vector<CLMethodInfo> methods;
 	int attributes_count;
 	std::vector<CLAttributeInfo> attributes;
-	void write(CLOutputStream out);
+	void write(CLOutputStream& out);
 	std::string class_access_flags_to_string(int access_flags);
 	std::string inner_class_access_flags_to_string(int access_flags);
 	std::string field_access_flags_to_string(int access_flags);

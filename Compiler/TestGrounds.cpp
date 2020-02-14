@@ -80,25 +80,25 @@ char* format_boot_path(const char* format_string, const char* home, int home_len
     return formatted_path;
 }
 
-int main() {
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
-    std::string test = console_exec_to_string("java -verbose");
-    size_t found = test.find("opened:");
-    if (found != std::string::npos) {
-        size_t end_pos = test.find('\n', found);
-        if (end_pos != std::string::npos) {
-            std::cout << test.substr(found + 8, end_pos);
-        }
-    }
-
-    std::string type_descriptor("[java/util/ArrayList;");
-    std::cout << type_descriptor.substr(1, type_descriptor.length()-2);
-    std::cout << "\n" << type_descriptor.back();
-    std::cout << "\n" << type_descriptor[type_descriptor.size()-1];
-
-#elif __linux__
-
-#elif __unix___
-    
-#endif
-}
+//int main() {
+//#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+//    std::string test = console_exec_to_string("java -verbose");
+//    size_t found = test.find("opened:");
+//    if (found != std::string::npos) {
+//        size_t end_pos = test.find('\n', found);
+//        if (end_pos != std::string::npos) {
+//            std::cout << test.substr(found + 8, end_pos);
+//        }
+//    }
+//
+//    std::string type_descriptor("[java/util/ArrayList;");
+//    std::cout << type_descriptor.substr(1, type_descriptor.length()-2);
+//    std::cout << "\n" << type_descriptor.back();
+//    std::cout << "\n" << type_descriptor[type_descriptor.size()-1];
+//
+//#elif __linux__
+//
+//#elif __unix___
+//    
+//#endif
+//}

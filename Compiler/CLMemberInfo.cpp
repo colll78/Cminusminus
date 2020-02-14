@@ -5,7 +5,7 @@ CLMemberInfo::CLMemberInfo(int access_flags, int name_index, int descriptor_inde
 {
 }
 
-void CLMemberInfo::write(CLOutputStream out){
+void CLMemberInfo::write(CLOutputStream& out){
 	out.write_short(access_flags);
 	out.write_short(name_index);
 	out.write_short(descriptor_index);

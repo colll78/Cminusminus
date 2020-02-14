@@ -52,6 +52,14 @@ std::string rtrim_copy(std::string s){
 
 namespace jmm_string_utils {
 
+    bool iequals(const std::string& a, const std::string& b){
+        return std::equal(a.begin(), a.end(),
+            b.begin(), b.end(),
+            [](char a, char b) {
+            return tolower(a) == tolower(b);
+        });
+    }
+
 	void replace_all(std::string& str, const std::string& from, const std::string& to){
         size_t start_pos = 0;
         int index_adv = to.length();

@@ -2,12 +2,14 @@
 #ifndef CLOUTPUTSTREAM_H
 #define CLOUTPUTSTREAM_H
 #include <string>
+#include <fstream>
 #include <vector>
 
 class CLOutputStream {
 public:
     CLOutputStream();
     CLOutputStream(int buf_size);
+    CLOutputStream(std::wstring f_name);
     void write(std::vector<std::byte> b, int off, int len);
     void write(std::vector<std::byte> b);
     void write(std::byte b);
@@ -24,7 +26,8 @@ public:
     void write_bytes(std::string str);
     void write_chars(std::string str);
     void write_UTF(std::string str);
-
+    void open();
+    void close();
     int size();
     void reset();
     void flush_buffer();
@@ -39,6 +42,10 @@ private:
     std::vector<std::byte> cle_output_bytes;
     std::vector<std::byte> bytearr;
     std::vector<std::byte> buf;
+    std::wstring file_path;
+    std::fstream file;
+    volatile bool closed;
+
 
 };
 

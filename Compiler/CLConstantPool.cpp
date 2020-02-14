@@ -66,7 +66,7 @@ int CLConstantPool::add_cp_item(CLCPInfo &cp_info){
 	return i;
 }
 
-void CLConstantPool::write(CLOutputStream out){
+void CLConstantPool::write(CLOutputStream& out){
 	for (int i = 0; i < cp_items.size(); i++) {
 		CLCPInfo* cp_info = cp_items.at(i).get();
 		if (cp_info != nullptr) {

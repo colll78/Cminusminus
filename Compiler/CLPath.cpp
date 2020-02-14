@@ -11,6 +11,7 @@ CLPath::CLPath(std::wstring path, std::wstring extdir){
 }
 
 std::optional<CLInputStream> CLPath::load_class(std::wstring name){
+	/* TODO: finish this */
 	std::optional<CLInputStream> reader = std::nullopt;
 	for (int i = 0; i < dirs.size(); i++) {
 		std::wstring dir = dirs.at(i);

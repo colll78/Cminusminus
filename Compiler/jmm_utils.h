@@ -16,7 +16,7 @@ std::string ltrim_copy(std::string s);
 std::string rtrim_copy(std::string s);
 
 namespace jmm_string_utils {
-
+    bool iequals(const std::string& a, const std::string& b);
     void replace_all(std::string& str, const std::string& from, const std::string& to);
     void replace_all(std::wstring& str, const std::wstring& from, const std::wstring& to);
 
@@ -79,7 +79,7 @@ namespace jmm_string_utils {
         is_any_of(const wchar_t c) : str(1, c) {}
 
 		bool operator() (char c) {
-            for (auto* s = str.data(); s != "\0"; s++) {
+            for (auto* s = str.data(); *s != '\0'; s++) {
                 if (*s == c) {
                     return true;
                 }
@@ -88,7 +88,7 @@ namespace jmm_string_utils {
         }
 
         bool operator() (wchar_t c) {
-            for (auto* s = str.data(); s != L"\0"; s++) {
+            for (auto* s = str.data(); *s != L'\0'; s++) {
                 if (*s == c) {
                     return true;
                 }

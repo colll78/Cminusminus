@@ -2,7 +2,7 @@
 #include "CLConstantClassInfo.h"
 
 
-void CLCPInfo::write(CLOutputStream out){
+void CLCPInfo::write(CLOutputStream& out){
 	out.write(tag);
 }
 

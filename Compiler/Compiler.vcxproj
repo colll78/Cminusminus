@@ -170,6 +170,8 @@
     <ClCompile Include="CLMemberInfo.cpp" />
     <ClCompile Include="CLOutputStream.cpp" />
     <ClCompile Include="CLPath.cpp" />
+    <ClCompile Include="GenFactorial.cpp" />
+    <ClCompile Include="JMMLogger.cpp" />
     <ClCompile Include="Scanner.cpp" />
     <ClCompile Include="TestGrounds.cpp" />
     <ClCompile Include="TokenInfo.cpp" />
@@ -199,6 +201,7 @@
     <ClInclude Include="CLMemberInfo.h" />
     <ClInclude Include="CLOutputStream.h" />
     <ClInclude Include="CLPath.h" />
+    <ClInclude Include="JMMLogger.h" />
     <ClInclude Include="jmm_global_macros.h" />
     <ClInclude Include="TokenInfo.h" />
     <ClInclude Include="jmm_utils.h" />

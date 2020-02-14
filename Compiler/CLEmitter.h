@@ -13,7 +13,7 @@ public:
 	CLEmitter(bool to_file);
 	void destination_dir(std::string dest_dir);
 	bool has_error_occurred();
-	void add_class(std::vector<std::string> access_flags, std::string this_class, std::string super_class, std::vector<std::string> super_interfaces, bool is_synthetic);
+	void add_class(std::vector<std::string> access_flags, std::string this_class, std::string super_class, std::optional<std::vector<std::string>> super_interfaces, bool is_synthetic);
 	void add_inner_class(std::vector<std::string> access_flags, std::string inner_class, std:: string outer_class, std::string inner_name);
 	void add_field(std::vector<std::string> access_flags, std::string name, std::string type, bool is_synthetic);
 	void add_field(std::vector<std::string> access_flags, std::string name, std::string type, bool is_synthetic, int i);
@@ -21,7 +21,7 @@ public:
 	void add_field(std::vector<std::string> access_flags, std::string name, bool is_synthetic, long long l);
 	void add_field(std::vector<std::string> access_flags, std::string name, bool is_synthetic, double d);
 	void add_field(std::vector<std::string> access_flags, std::string name, bool is_synthetic, std::string s);
-	void add_method(std::vector<std::string> access_flags, std::string name, std::string descriptor, std::vector<std::string> exceptions, bool is_synthetic);
+	void add_method(std::vector<std::string> access_flags, std::string name, std::string descriptor, std::optional<std::vector<std::string>> exceptions, bool is_synthetic);
 	void add_exception_handler(std::string start_label, std::string end_label, std::string handler_label, std::string catch_type);
 	void add_no_arg_instruction(int opcode);
 	void add_one_arg_instruction(int opcode, int arg);
@@ -32,6 +32,7 @@ public:
 	void add_MULTIANEWARRAY_instruction(std::string type, int dim);
 	void add_branch_instruction(int opcode, std::string label);
 	void add_TABLESWITCH_instruction(std::string default_label, int low, int high, std::vector<std::string> labels);
+	void add_LOOKUPSWITCH_instruction(std::string default_label, int num_pairs, std::map<int, std::string> match_label_pairs);
 	void add_LDC_instruction(int i);
 	void add_LDC_instruction(float f);
 	void add_LDC_instruction(long long l);
