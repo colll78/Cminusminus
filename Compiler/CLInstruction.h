@@ -3,6 +3,7 @@
 #include <string>
 #include <array>
 #include <vector>
+#include <unordered_map>
 #include <map>
 
 class CLInsInfo;
@@ -111,7 +112,7 @@ public:
 	 * given label to pc mapping. If unable to resolve a label, the offset is
 	 * set such that the next instruction will be executed.
 	 */
-	bool resolve_labels(std::map<std::string, int> label_to_pc);
+	bool resolve_labels(std::unordered_map<std::string, int> label_to_pc);
 	/**
 	* Returns the pc of instruction to jump to.
 	* @return pc to jump to.

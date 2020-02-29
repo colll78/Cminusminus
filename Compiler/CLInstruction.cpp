@@ -511,7 +511,7 @@ CLFlowControlInstruction::CLFlowControlInstruction(int opcode, int pc, std::stri
     operand_count = pad + 8 + 8 * num_pairs;
 }
 
-bool CLFlowControlInstruction::resolve_labels(std::map<std::string, int> label_to_pc){
+bool CLFlowControlInstruction::resolve_labels(std::unordered_map<std::string, int> label_to_pc){
     bool all_labels_resolved = true;
     if (instruction_info[opcode].category == CLConstants::FLOW_CONTROL1) {
         if (label_to_pc.count(jump_to_label)) {

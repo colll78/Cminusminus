@@ -12,7 +12,16 @@ public:
 			va_list args;
 			int done;
 			va_start(args, format);
-			done = fprintf(stderr, format, args, 0);
+			done = vfprintf(stderr, format, args);
+			va_end(args);
+		}
+	}
+	template<log_level msg_lvl> static void slog(const char* format, ...) {
+		if (msg_lvl == _threshold_level) {
+			va_list args;
+			int done;
+			va_start(args, format);
+			done = vfprintf(stderr, format, args);
 			va_end(args);
 		}
 	}

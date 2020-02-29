@@ -2,6 +2,10 @@
 #include "CLConstants.h"
 #include "jmm_utils.h"
 
+CLFile::CLFile() : attributes(nullptr) {
+
+}
+
 void CLFile::write(CLOutputStream &out) {
 	out.write_int(magic);
 	out.write_short(minor_version);
@@ -24,8 +28,8 @@ void CLFile::write(CLOutputStream &out) {
 		methods.at(i).write(out);
 	}
 	out.write_short(attributes_count);
-	for (int i = 0; i < attributes.size(); i++) {
-		attributes.at(i).write(out);
+	for (int i = 0; i < attributes->size(); i++) {
+		attributes->at(i)->write(out);
 	}
 }
 

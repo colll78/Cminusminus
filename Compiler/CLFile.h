@@ -4,6 +4,7 @@
 
 class CLFile {
 public:
+	CLFile();
 	long long magic; // 0xCAFEBABE
 	int minor_version;
 	int major_version;
@@ -19,7 +20,7 @@ public:
 	int methods_count;
 	std::vector<CLMethodInfo> methods;
 	int attributes_count;
-	std::vector<CLAttributeInfo> attributes;
+	std::vector<std::unique_ptr<CLAttributeInfo>> *attributes;
 	void write(CLOutputStream& out);
 	std::string class_access_flags_to_string(int access_flags);
 	std::string inner_class_access_flags_to_string(int access_flags);

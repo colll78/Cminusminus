@@ -1,6 +1,9 @@
+#define _CRT_SECURE_NO_WARNINGS 1
 #include "CLOutputStream.h"
 #include "jmm_utils.h"
 #include "iostream"
+//#include <cstring>
+//#include <cerrno>
 
 CLOutputStream::CLOutputStream() : buf(8192), buf_count(0), cle_output_bytes(32), count(0), bytes_written(0) , closed(true){
 	
@@ -9,7 +12,12 @@ CLOutputStream::CLOutputStream() : buf(8192), buf_count(0), cle_output_bytes(32)
 CLOutputStream::CLOutputStream(std::wstring f_name) : buf(8192), buf_count(0), cle_output_bytes(32), count(0), bytes_written(0) {
 	closed = false;
 	file_path = f_name;
-	file.open(file_path, std::fstream::binary);
+	file.open(file_path, std::fstream::binary | std::fstream::out);
+	//if (!file.is_open()) {
+	  //std::cout << std::strerror(errno) << '\n'; // displays "Permission denied"
+  
+	//}
+	std::cout << (file.is_open() ? "True" : "False");
 }
 
 void CLOutputStream::write(std::vector<std::byte> b, int off, int len) {

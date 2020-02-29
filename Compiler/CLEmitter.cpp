@@ -3,13 +3,14 @@
 #include <filesystem>
 #include <locale>
 #include <codecvt>
-
+#include <iostream>
+#include "JMMLogger.h"
 
 
 CLException::CLException(std::string start_label, std::string end_label, std::string handler_label, std::string catch_type)
 : start_label(start_label), end_label(end_label), handler_label(handler_label), catch_type(catch_type) {}
 
-bool CLException::resolve_labels(std::map<std::string, int> label_to_pc){
+bool CLException::resolve_labels(std::unordered_map<std::string, int> label_to_pc){
 	bool all_labels_resolved = true;
 	if (label_to_pc.count(start_label)) {
 		start_pc = label_to_pc[start_label];
@@ -90,9 +91,80 @@ void CLEmitter::end_open_method_if_any(){
 		}
 		std::vector<CLExceptionInfo> exception_table;
 		for (int i = 0; i < m_exception_handlers.size(); i++) {
-
+			CLException e = m_exception_handlers.at(i);
+			if (!e.resolve_labels(m_labels)) {
+				report_emitter_error(e_current_method, ": unable to resolve exception handler labels");
+			}
+			int catch_type_index = (e.catch_type == "" ? 0 : constant_pool.constant_class_info(e.catch_type));
+			CLExceptionInfo c(e.start_pc, e.end_pc, e.handler_pc, catch_type_index);
+			exception_table.push_back(c);
 		}
+		std::vector<int> byte_code;
+		int max_locals = m_argument_count;
+		for (int i = 0; i < m_code.size(); i++) {
+			CLInstruction* instr = m_code.at(i).get();
+			int local_variable_index = instr->get_local_variable_index();
+			switch (instr->get_opcode()) {
+			case CLConstants::LLOAD:
+			case CLConstants::LSTORE:
+			case CLConstants::DSTORE:
+			case CLConstants::DLOAD:
+			case CLConstants::LLOAD_0:
+			case CLConstants::LLOAD_1:
+			case CLConstants::LLOAD_2:
+			case CLConstants::LLOAD_3:
+			case CLConstants::LSTORE_0:
+			case CLConstants::LSTORE_1:
+			case CLConstants::LSTORE_2:
+			case CLConstants::LSTORE_3:
+			case CLConstants::DLOAD_0:
+			case CLConstants::DLOAD_1:
+			case CLConstants::DLOAD_2:
+			case CLConstants::DLOAD_3:
+			case CLConstants::DSTORE_0:
+			case CLConstants::DSTORE_1:
+			case CLConstants::DSTORE_2:
+			case CLConstants::DSTORE_3:
+				local_variable_index++;
+			}
+			max_locals = std::max(max_locals, local_variable_index + 1);
+
+			if (typeid(instr) == typeid(CLFlowControlInstruction)) {
+				if (CLFlowControlInstruction* b = dynamic_cast<CLFlowControlInstruction*>(instr)) {
+					if (b->resolve_labels(m_labels)) {
+						report_emitter_error(e_current_method, ": Unable to resolve jump labels");
+					}
+				}
+			}
+			std::vector<int> instr_bytes = instr->to_bytes();
+			byte_code.insert(byte_code.end(), instr_bytes.begin(), instr_bytes.end());
+		}
+
+		if (!((m_access_flags & CLConstants::ACC_NATIVE) == CLConstants::ACC_NATIVE || (m_access_flags & CLConstants::ACC_ABSTRACT) == CLConstants::ACC_ABSTRACT)) {
+			std::unique_ptr<CLAttributeInfo> code_attri = std::make_unique<CLCodeAttribute>(code_attribute(byte_code, exception_table, stack_depth(), max_locals));
+			add_method_attribute(std::move(code_attri));
+		}
+
+		//CLMethodInfo(mAccessFlags, mNameIndex, mDescriptorIndex, mAttributes.size(), mAttributes))
+		CLMethodInfo m_info(m_access_flags, m_name_index, m_descriptor_index, m_attributes.size(), m_attributes);
+		methods.push_back(m_info);
 	}
+	
+	if (!inner_classes.empty()) {
+		std::unique_ptr<CLAttributeInfo> class_attri = std::make_unique<CLInnerClassesAttribute>(inner_classes_attribute());
+		add_class_attribute(std::move(class_attri));
+	}
+	cl_file.constant_pool_count = constant_pool.size() + 1;
+	cl_file.constant_pool = constant_pool;
+	cl_file.interfaces_count = interfaces.size();
+	cl_file.interfaces = interfaces;
+	cl_file.fields_count = fields.size();
+	cl_file.fields = fields;
+	cl_file.methods_count = methods.size();
+	cl_file.methods = methods;
+	cl_file.attributes_count = attributes.size();
+	cl_file.attributes = &attributes;
+	 
 }
 
 void CLEmitter::add_field_info(std::vector<std::string> access_flags, std::string name, std::string type, bool is_synthetic, int c){
@@ -114,7 +186,7 @@ void CLEmitter::add_field_info(std::vector<std::string> access_flags, std::strin
 	if (c != -1) {
 		add_field_attribute(std::make_unique<CLConstantValueAttribute>(constant_value_attribute(c)));
 	}
-	//fields.push_back()
+	fields.push_back(CLFieldInfo(flags, name_index, descriptor_index, f_attributes.size(), f_attributes));
 }
 
 int CLEmitter::type_stack_residue(std::string descriptor){
@@ -145,7 +217,7 @@ int CLEmitter::method_stack_residue(std::string descriptor){
 	if (rparen_index == std::string::npos) {
 		report_emitter_error(descriptor, " is not a valid method descriptor.");
 	}
-	std::string arg_types = descriptor.substr(1, descriptor.size() - rparen_index);
+	std::string arg_types = descriptor.substr(1, rparen_index);
 	std::string return_type = descriptor.substr(rparen_index + 1);
 	for (int j = 0; j < arg_types.size(); j++) {
 		char c = arg_types.at(j);
@@ -181,7 +253,7 @@ int CLEmitter::argument_count(std::string descriptor){
 	if (rparen_index == std::string::npos) {
 		report_emitter_error(descriptor, " is not a valid method descriptor.");
 	}
-	std::string arg_types = descriptor.substr(1, rparen_index);
+	std::string arg_types = descriptor.substr(1, rparen_index - 1);
 	for (int j = 0; j < arg_types.size(); j++) {
 		char c = arg_types.at(j);
 		switch (c) {
@@ -256,11 +328,12 @@ bool CLEmitter::valid_type_descriptor(std::string descriptor){
 }
 
 bool CLEmitter::valid_method_descriptor(std::string descriptor){
-	if (descriptor.size() > 0) {
+	if (!descriptor.empty()) {
 		std::string::size_type cparen_pos = descriptor.find_last_of(')');
 		if (cparen_pos != std::string::npos && ((cparen_pos + 1) != std::string::npos)) {
-			std::string arg_types = descriptor.substr(1, cparen_pos);
+			std::string arg_types = descriptor.substr(1, cparen_pos - 1);
 			std::string return_type = descriptor.substr(cparen_pos + 1);
+			//logger::log<LOG_DEBUG>("Arg Types: %s\nReturn Type: %s\n", arg_types.c_str(), return_type.c_str());
 			for (int i = 0; i < arg_types.size(); i++) {
 				char c = arg_types[i];
 				switch (c) {
@@ -894,12 +967,17 @@ CLFile& CLEmitter::get_cl_file(){
 void CLEmitter::write(){
 	end_open_method_if_any();
 	if (!to_file) {
+		logger::log<LOG_DEBUG>("Not to file.");
 		return;
 	}
+	logger::log<LOG_DEBUG>("Output file name: %s", name.c_str());
 	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 	std::wstring wide_name = converter.from_bytes(name);
+	dest_dir = L"";
 	std::wstring outfile = dest_dir + std::filesystem::path::preferred_separator + wide_name + L".class";
+	std::wcout << outfile << L"\n";
 	CLOutputStream out(outfile);
+	
 	cl_file.write(out);
 	out.flush_buffer();
 	out.close();

@@ -5,7 +5,7 @@
 
 int main() {
 	logger::threshold_level() = LOG_DEBUG;
-	logger::log<LOG_DEBUG>("%s %s", "this is ", "a test.");
+	//logger::log<LOG_DEBUG>("%s %s", "this is ", "a test.");
 	CLEmitter e(true);
 	std::vector<std::string> access_flags;
 	access_flags.push_back("public");

@@ -117,7 +117,7 @@ public:
 	int end_pc;
 	int handler_pc;
 	CLException(std::string start_label, std::string end_label, std::string handler_label, std::string catch_type);
-	bool resolve_labels(std::map<std::string, int> label_to_pc);
+	bool resolve_labels(std::unordered_map<std::string, int> label_to_pc);
 private:
 };
 
